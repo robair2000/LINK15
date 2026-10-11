@@ -1,6 +1,5 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
@@ -16,13 +15,10 @@ st.set_page_config(
     layout='wide',
 )
 
-st.title(
-    '🔗 Chainlink (LINK) Institutioneel 15m Scalping Quant Model'
-)
+st.title('🔗 Chainlink (LINK) Institutioneel 15m Scalping Quant Model')
 st.markdown(
     'Dit professionele dashboard combineert **15m orderflow**, **Multi-Timeframe'
-    ' Trend Filter**, **ATR Risk Management**, **SHAP Explainability** en'
-    ' **Backtesting** specifiek voor Chainlink — volledig vrij van gesimuleerde data.'
+    ' Trend Filter**, **ATR Risk Management** en **Backtesting** — 100% feitelijke data.'
 )
 
 
@@ -30,7 +26,6 @@ st.markdown(
 @st.cache_data(ttl=300)
 def load_market_data():
   try:
-    # 15m data voor scalping
     df = yf.download(
         'LINK-USD', period='30d', interval='15m', progress=False
     )
@@ -54,7 +49,6 @@ def load_market_data():
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values('Date').dropna(subset=['close']).reset_index(drop=True)
 
-    # Daily data voor Multi-Timeframe Trend Filter
     df_daily = yf.download(
         'LINK-USD', period='60d', interval='1d', progress=False
     )
@@ -66,7 +60,6 @@ def load_market_data():
     df_daily['Date'] = pd.to_datetime(df_daily['Date'])
     df_daily['daily_SMA50'] = df_daily['daily_close'].rolling(window=50).mean()
 
-    # Merge daily trend into 15m df based on date
     df['Date_only'] = df['Date'].dt.date
     df_daily['Date_only'] = df_daily['Date'].dt.date
     df = pd.merge(
@@ -104,58 +97,4 @@ def add_advanced_indicators(df):
   upper_band = sma_20 + (std_20 * 2)
   lower_band = sma_20 - (std_20 * 2)
   df['BB_pct_b'] = (df['close'] - lower_band) / (
-      upper_band - lower_band + 1e-8
-  )
-
-  high_low = df['high'] - df['low']
-  high_close = np.abs(df['high'] - df['close'].shift())
-  low_close = np.abs(df['low'] - df['close'].shift())
-  true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-  df['ATR'] = true_range.rolling(window=14).mean()
-
-  df['SMA_20'] = sma_20
-  df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
-  df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
-  df['MACD'] = df['EMA_9'] - df['EMA_21']
-  df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-
-  delta = df['close'].diff()
-  gain = delta.where(delta > 0, 0.0)
-  loss = -delta.where(delta < 0, 0.0)
-  rs = gain.rolling(window=14).mean() / loss.rolling(window=14).mean()
-  df['RSI'] = 100 - (100 / (1 + rs))
-
-  # Multi-Timeframe Trend Filter (1 = Bullish, 0 = Bearish)
-  df['mtf_trend_bullish'] = (df['daily_close'] > df['daily_SMA50']).astype(int)
-
-  return df
-
-
-@st.cache_data(ttl=300)
-def fetch_crypto_fear_greed():
-  try:
-    res = requests.get('https://api.alternative.me/fng/?limit=1', timeout=5).json()
-    return float(res['data'][0]['value'])
-  except Exception:
-    return 50.0
-
-
-# --- DATA LADEN ---
-with st.spinner('Laden van Chainlink marktdata en berekenen van features...'):
-  df = load_market_data()
-  if df is None or df.empty:
-    st.error('Kon geen LINK data laden.')
-    st.stop()
-
-  df = add_advanced_indicators(df)
-  df['fear_greed'] = fetch_crypto_fear_greed()
-  df['Target'] = df['close'].shift(-1)
-  df = df.dropna().reset_index(drop=True)
-
-# --- SIDEBAR CONFIGURATIE ---
-st.sidebar.header('⚙️ Model & Strategie Instellingen')
-test_size = st.sidebar.slider(
-    'Test / Train Splitsing (%)', 10, 40, 20, step=5
-)
-n_estimators = st.sidebar.slider('XGBoost Bomen (n_estimators)', 50, 300, 150)
-max_depth = st.sidebar.slider('Maximale Boomdiepte (max_depth)', 3, 10, 4)
+      upper_band - lower_
