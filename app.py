@@ -1,9 +1,9 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
-import shap
 import streamlit as st
 import xgboost as xgb
 import yfinance as yf
@@ -22,7 +22,7 @@ st.title(
 st.markdown(
     'Dit professionele dashboard combineert **15m orderflow**, **Multi-Timeframe'
     ' Trend Filter**, **ATR Risk Management**, **SHAP Explainability** en'
-    ' **Backtesting** specifiek voor Chainlink.'
+    ' **Backtesting** specifiek voor Chainlink — volledig vrij van gesimuleerde data.'
 )
 
 
@@ -93,10 +93,6 @@ def fetch_realtime_binance_price():
 
 
 def add_advanced_indicators(df):
-  df['taker_buy_ratio'] = (df['close'] - df['low']) / (
-      df['high'] - df['low'] + 1e-8
-  )
-
   typical_price = (df['high'] + df['low'] + df['close']) / 3
   df['VWAP'] = (typical_price * df['volume']).rolling(window=96).sum() / (
       df['volume'].rolling(window=96).sum() + 1e-8
@@ -169,13 +165,13 @@ st.sidebar.subheader('🤖 Notificatie / Webhook (Optioneel)')
 webhook_url = st.sidebar.text_input('Discord/Telegram Webhook URL')
 send_alert = st.sidebar.button('Stuur Signaal Test')
 
+# Zuivere features-lijst zonder taker_buy_ratio
 features = [
     'close',
     'open',
     'high',
     'low',
     'volume',
-    'taker_buy_ratio',
     'VWAP_distance',
     'BB_pct_b',
     'ATR',
@@ -218,13 +214,18 @@ current_price = realtime_price if realtime_price else float(df['close'].iloc[-1]
 current_atr = float(df['ATR'].iloc[-1])
 is_mtf_bullish = bool(df['mtf_trend_bullish'].iloc[-1])
 
-col1, col2, col3, col4 = st.columns(4)
+# Brusselse tijd ophalen
+brussels_tz = ZoneInfo('Europe/Brussels')
+laatste_update = datetime.now(brussels_tz).strftime('%H:%M:%S (%d-%m-%Y)')
+
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric('Huidige LINK Koers (Live)', f'${current_price:,.3f}')
 col2.metric('Model Score ($R^2$)', f'{score:.2f}')
 col3.metric('Directional Win-Rate', f'{directional_acc:.1f}%')
 col4.metric(
     'Daily Trend Filter', '🟢 BULLISH' if is_mtf_bullish else '🔴 BEARISH'
 )
+col5.metric('Laatste Call (Brussel)', laatste_update)
 
 st.markdown('---')
 
@@ -235,8 +236,16 @@ price_diff = predicted_price - current_price
 percentage_diff = (price_diff / current_price) * 100
 
 # ATR Risk Management voor LINK
-stop_loss = current_price - (1.5 * current_atr) if price_diff > 0 else current_price + (1.5 * current_atr)
-take_profit = current_price + (2.5 * current_atr) if price_diff > 0 else current_price - (2.5 * current_atr)
+stop_loss = (
+    current_price - (1.5 * current_atr)
+    if price_diff > 0
+    else current_price + (1.5 * current_atr)
+)
+take_profit = (
+    current_price + (2.5 * current_atr)
+    if price_diff > 0
+    else current_price - (2.5 * current_atr)
+)
 
 st.subheader('🔮 15-Minuten Scalping Signaal & Risk Management')
 
@@ -248,66 +257,4 @@ col_a.metric(
     delta=f'{percentage_diff:+.3f}%',
 )
 col_b.metric('Aanbevolen Stop-Loss', f'${stop_loss:,.3f}')
-col_c.metric('Aanbevolen Take-Profit', f'${take_profit:,.3f}')
-
-if predicted_price > current_price and is_mtf_bullish:
-  st.success(
-      '**STERK LONG SIGNAAL 🚀** — Het model verwacht een stijging en de'
-      ' dagelijkse trend van LINK is positief.'
-  )
-elif predicted_price > current_price and not is_mtf_bullish:
-  st.warning(
-      '**LET OP: Tegen-trend signaal ⚠️** — Model voorspelt stijging, maar de'
-      ' dagelijkse trend van LINK is negatief.'
-  )
-else:
-  st.error(
-      '**SHORT SIGNAAL 📉** — Het model verwacht een daling over de komende 15'
-      ' minuten.'
-  )
-
-# Webhook logica
-if send_alert and webhook_url:
-  try:
-    payload = {
-        'content': (
-            '🔗 **Chainlink 15m Scalping Alert** \nKoers: $'
-            f' {current_price:,.3f}\nDoel: ${predicted_price:,.3f}'
-            f' ({percentage_diff:+.3f}%)\nSL: ${stop_loss:,.3f} | TP:'
-            f' ${take_profit:,.3f}'
-        )
-    }
-    requests.post(webhook_url, json=payload, timeout=5)
-    st.sidebar.success('Signaal succesvol verzonden via webhook!')
-  except Exception as e:
-    st.sidebar.error(f'Fout bij versturen: {e}')
-
-st.markdown('---')
-
-# --- SHAP EXPLAINABILITY ---
-st.subheader('🔍 SHAP Model Explainability (Waarom deze voorspelling?)')
-st.markdown(
-    'Hieronder zie je welke indicatoren het zwaarst meetelden in de beslissing'
-    ' van de AI voor de meest recente 15m candle:'
-)
-
-try:
-  explainer = shap.TreeExplainer(model)
-  shap_values = explainer(X.tail(1))
-
-  fig, ax = plt.subplots(figsize=(10, 4))
-  shap.plots.waterfall(shap_values[0], max_display=8, show=False)
-  st.pyplot(fig)
-except Exception as e:
-  st.info(
-      'SHAP plot kon niet direct worden gerenderd:'
-      f' {e}'
-  )
-
-st.markdown('---')
-
-st.subheader('📊 Belangrijkste Features volgens XGBoost')
-importances = pd.Series(model.feature_importances_, index=features).sort_values(
-    ascending=True
-)
-st.bar_chart(importances)
+col_c.metric('Aanbevolen Take-
