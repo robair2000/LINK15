@@ -149,4 +149,13 @@ with st.spinner('Laden van Chainlink marktdata en berekenen van features...'):
 
   df = add_advanced_indicators(df)
   df['fear_greed'] = fetch_crypto_fear_greed()
-  df['Target'] = df['close'].shift(-1
+  df['Target'] = df['close'].shift(-1)
+  df = df.dropna().reset_index(drop=True)
+
+# --- SIDEBAR CONFIGURATIE ---
+st.sidebar.header('⚙️ Model & Strategie Instellingen')
+test_size = st.sidebar.slider(
+    'Test / Train Splitsing (%)', 10, 40, 20, step=5
+)
+n_estimators = st.sidebar.slider('XGBoost Bomen (n_estimators)', 50, 300, 150)
+max_depth = st.sidebar.slider('Maximale Boom
