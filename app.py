@@ -113,42 +113,4 @@ def add_advanced_indicators(df):
   delta = df['close'].diff()
   gain = delta.where(delta > 0, 0.0)
   loss = -delta.where(delta < 0, 0.0)
-  rs = gain.rolling(window=14).mean() / loss.rolling(window=14).mean()
-  df['RSI'] = 100 - (100 / (1 + rs))
-
-  df['mtf_trend_bullish'] = (df['daily_close'] > df['daily_SMA50']).astype(int)
-
-  return df
-
-
-@st.cache_data(ttl=300)
-def fetch_crypto_fear_greed():
-  try:
-    res = requests.get('https://api.alternative.me/fng/?limit=1', timeout=5).json()
-    return float(res['data'][0]['value'])
-  except Exception:
-    return 50.0
-
-
-# --- DATA LADEN ---
-with st.spinner('Laden van Chainlink marktdata en berekenen van features...'):
-  df = load_market_data()
-  if df is None or df.empty:
-    st.error('Kon geen LINK data laden via Yahoo Finance. Probeer zo dadelijk opnieuw.')
-    st.stop()
-
-  df = add_advanced_indicators(df)
-  df['fear_greed'] = fetch_crypto_fear_greed()
-  df['Target'] = df['close'].shift(-1)
-  df = df.dropna().reset_index(drop=True)
-
-# --- SIDEBAR CONFIGURATIE ---
-st.sidebar.header('⚙️ Model & Strategie Instellingen')
-test_size = st.sidebar.slider('Test / Train Splitsing (%)', 10, 40, 20, step=5)
-n_estimators = st.sidebar.slider('XGBoost Bomen (n_estimators)', 50, 300, 150)
-max_depth = st.sidebar.slider('Maximale Boomdiepte (max_depth)', 3, 10, 4)
-
-st.sidebar.markdown('---')
-st.sidebar.subheader('🤖 Notificatie / Webhook (Optioneel)')
-webhook_url = st.sidebar.text_input('Discord/Telegram Webhook URL')
-send_alert = st.sidebar.
+  rs = gain.rolling
